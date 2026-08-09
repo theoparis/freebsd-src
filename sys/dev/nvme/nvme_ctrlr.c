@@ -189,6 +189,16 @@ nvme_ctrlr_construct_io_qpairs(struct nvme_controller *ctrlr)
 	 */
 	num_trackers = min(num_trackers, (num_entries-1));
 
+	/* Some Apple controllers have trouble with certain combinations of
+   * outstanding requests. Limit the queue depth to work around this
+   * issue.
+   */
+  if (ctrlr->quirks & QUIRK_QDEPTH_ONE) {
+      nvme_printf(ctrlr, "limiting queue depth due to controller quirks\n");
+      num_entries = 2;
+      num_trackers = 1;
+  }
+
 	if (ctrlr->quirks & QUIRK_APPLE_SHARED_CID_SPACE)
 		num_trackers = min(num_trackers,
 		    NVME_ADMIN_ENTRIES - ctrlr->adminq.num_trackers);
@@ -199,7 +209,7 @@ nvme_ctrlr_construct_io_qpairs(struct nvme_controller *ctrlr)
 	 * not a hard limit and will need to be revisited when the upper layers
 	 * of the storage system grows multi-queue support.
 	 */
-	ctrlr->max_hw_pend_io = num_trackers * ctrlr->num_io_queues * 3 / 4;
+	ctrlr->max_hw_pend_io = max(num_trackers * ctrlr->num_io_queues * 3 / 4, 1);
 
 	ctrlr->ioq = malloc(ctrlr->num_io_queues * sizeof(struct nvme_qpair),
 	    M_NVME, M_ZERO | M_WAITOK);

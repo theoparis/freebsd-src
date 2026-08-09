@@ -97,6 +97,7 @@ static struct _pcsid
 	{ 0xa821144d,		0, 0, "Samsung PM1725", QUIRK_DELAY_B4_CHK_RDY },
 	{ 0xa822144d,		0, 0, "Samsung PM1725a", QUIRK_DELAY_B4_CHK_RDY },
 	{ 0x07f015ad,		0, 0, "VMware NVMe Controller" },
+	{ 0x2001106b,   0, 0, "Apple S1X NVMe Controller", QUIRK_SINGLE_VECTOR | QUIRK_QDEPTH_ONE },
 	{ 0x2003106b,		0, 0, "Apple S3X NVMe Controller" },
 	{ 0x2005106b,		0, 0, "Apple ANS2 NVMe Controller (T2)",
 	    QUIRK_APPLE_IDENTIFY_CNS_BROKEN | QUIRK_APPLE_SHARED_CID_SPACE |
@@ -328,6 +329,7 @@ nvme_ctrlr_setup_interrupts(struct nvme_controller *ctrlr)
 	int		force_intx, num_io_queues, per_cpu_io_queues;
 	int		min_cpus_per_ioq;
 	int		num_vectors_requested;
+	int   num_msi;
 
 	dev = ctrlr->dev;
 
@@ -398,7 +400,8 @@ msi:
 	 * Try to allocate 2 MSIs (admin and I/O queues), but accept single
 	 * shared if have to.  Fall back to INTx if can't get any MSI.
 	 */
-	ctrlr->msi_count = min(pci_msi_count(dev), 2);
+	num_msi = (ctrlr->quirks & QUIRK_SINGLE_VECTOR) ? 1 : pci_msi_count(dev);
+  ctrlr->msi_count = min(num_msi, 2);
 	if (ctrlr->msi_count > 0) {
 		if (pci_alloc_msi(dev, &ctrlr->msi_count) != 0) {
 			nvme_printf(ctrlr, "unable to allocate MSI\n");
